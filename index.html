@@ -302,8 +302,11 @@
     <div class="Backup-container">
         <button id="backup" class="Backup-btn">Backup 🔽</button>
         <div id="Backup">
+            <button data-a="ih">Import HTML</button>
             <button data-a="ij">Import JSON</button>
             <button data-a="ix">Import Excel</button>
+            <hr style="margin: 0; border: none; border-top: 1px solid var(--border-color);">
+            <button data-a="eh">Export HTML</button>
             <button data-a="ej">Export JSON</button>
             <button data-a="ex">Export Excel</button>
         </div>
@@ -371,12 +374,6 @@
     </div>
 </div>
 
-<div>
-  <footer>
-    @copy 2025 Santosh Phuyal. All rights reserved.
-  </footer>
-</div>
-
 <script>
 const storage = {
   get: () => {
@@ -412,7 +409,7 @@ class BookmarkApp {
     this.redoStack = [];
     this.dragged = null;
     
-    console.log("APP STARTED. Loaded Links:", this.links);
+    console.log("APP STARTED. Loaded Links: Object");
     this.init();
   }
 
@@ -471,7 +468,6 @@ class BookmarkApp {
     return text.slice(0, idx) + `<span class="highlight">${text.slice(idx, idx + query.length)}</span>` + text.slice(idx + query.length);
   }
 
-  // --- MODIFIED RENDER SECTIONS ---
   renderSections(containerId, query = '', showHidden = false) {
     console.group(`Rendering Container: ${containerId}`);
     const container = document.getElementById(containerId);
@@ -511,7 +507,6 @@ class BookmarkApp {
       addBtn.onclick = () => this.addLink(sectionName);
       card.appendChild(addBtn);
 
-      // Only show settings buttons in the settings tab
       if (containerId === 'setCont') {
         const delBtn = document.createElement('button');
         delBtn.textContent = 'Delete';
@@ -546,7 +541,6 @@ class BookmarkApp {
         li.dataset.section = sectionName;
         li.dataset.index = index;
         
-        // Dragging/Drop is only enabled on the Settings tab
         if (containerId === 'setCont') {
             li.draggable = true;
         }
@@ -556,7 +550,6 @@ class BookmarkApp {
         a.target = '_blank';
         a.innerHTML = this.highlight(link.name || 'No Name', query);
         
-        // Styling for hidden links in settings
         if (link.hidden && containerId === 'setCont') {
           a.style.opacity = '0.5';
           a.style.textDecoration = 'line-through';
@@ -567,7 +560,6 @@ class BookmarkApp {
         actions.className = 'actions';
 
         if (containerId === 'setCont') {
-          // Add settings actions (Edit, Delete, Eye)
           const eye = document.createElement('button');
           eye.className = 'eye' + (link.hidden ? ' hidden' : '');
           eye.innerHTML = link.hidden ? 'Hidden' : 'Visible';
@@ -594,8 +586,7 @@ class BookmarkApp {
           li.appendChild(actions);
 
         } else {
-            // HOME PAGE: Keep the link clickable by not adding extra actions.
-            li.style.cursor = 'pointer'; // Make it look like a clickable item
+            li.style.cursor = 'pointer'; 
         }
         
         ul.appendChild(li);
@@ -683,7 +674,6 @@ class BookmarkApp {
     console.clear();
     console.log("--- STARTING RENDER ---");
     
-    // Get search query from BOTH inputs
     const setQuery = (document.getElementById('search')?.value || '').trim();
     const homeQuery = (document.getElementById('homeSearch')?.value || '').trim();
     
@@ -691,7 +681,6 @@ class BookmarkApp {
     this.renderSections('setCont', setQuery, true);
     this.renderBin(setQuery);
     
-    // FINAL DOM CHECK (kept for diagnostic summary)
     setTimeout(() => {
         const totalLis = document.querySelectorAll('#homeCont li').length;
         console.log(`[FINAL CHECK] Total 'li' elements in DOM: ${totalLis}`);
@@ -747,6 +736,86 @@ class BookmarkApp {
     this.bin.splice(index, 1);
     this.save();
     this.render();
+  }
+  
+  // --- NEW HTML EXPORT FUNCTION ---
+  exportHtml() {
+    let html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE>Bookmarks</TITLE>
+<H1>Bookmarks</H1>\n`;
+    
+    const buildSection = (sectionName, links) => {
+        let section = `<DL><p>\n<DT><H3 ADD_DATE="${Math.floor(Date.now()/1000)}" LAST_MODIFIED="${Math.floor(Date.now()/1000)}">${sectionName}</H3>\n<DL><p>\n`;
+        links.forEach(link => {
+            // Only export visible links
+            if (!link.hidden) {
+                section += `<DT><A HREF="${link.url}" ADD_DATE="${Math.floor(Date.now()/1000)}">${link.name}</A>\n`;
+            }
+        });
+        section += `</DL><p>\n</DL><p>\n`;
+        return section;
+    };
+
+    html += '<DL><p>\n';
+    Object.keys(this.links).forEach(sectionName => {
+        html += buildSection(sectionName, this.links[sectionName]);
+    });
+    html += '</DL><p>\n';
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bookmarks.html';
+    a.click();
+  }
+  
+  // --- NEW HTML IMPORT FUNCTION ---
+  importHtml(content) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'text/html');
+    const importedLinks = {};
+    
+    // Find all <DT><H3> elements (representing folders/sections)
+    const h3s = doc.querySelectorAll('h3');
+
+    h3s.forEach(h3 => {
+      const sectionName = h3.textContent.trim();
+      let currentElement = h3.nextElementSibling;
+      const links = [];
+
+      // Navigate down the sibling elements until the next H3 or end of document
+      while (currentElement && currentElement.tagName !== 'H3') {
+        if (currentElement.tagName === 'DT') {
+          const a = currentElement.querySelector('a');
+          if (a && a.href) {
+            links.push({
+              name: a.textContent.trim() || a.href,
+              url: a.href,
+              hidden: false
+            });
+          }
+        }
+        currentElement = currentElement.nextElementSibling;
+      }
+      if (links.length > 0) {
+        importedLinks[sectionName] = links;
+      }
+    });
+
+    this.pushUndo();
+    Object.entries(importedLinks).forEach(([section, newLinks]) => {
+      if (!this.links[section]) this.links[section] = [];
+      newLinks.forEach(link => {
+        if (!this.links[section].some(x => x.url === link.url)) {
+          this.links[section].push(link);
+        }
+      });
+    });
+    this.save();
+    this.render();
+    alert('HTML bookmarks imported successfully!');
   }
 
   async init() {
@@ -824,21 +893,18 @@ class BookmarkApp {
         }
     };
     
-    // HOME PAGE SEARCH BUTTON & INPUT LOGIC (FIXED)
+    // HOME PAGE SEARCH BUTTON & INPUT LOGIC
     const homeSearchBtn = document.getElementById('homeSearchBtn');
     const homeSearchInput = document.getElementById('homeSearch');
 
     if (homeSearchBtn) {
         homeSearchBtn.onclick = () => {
-            // Show the search input and focus it
             homeSearchInput.classList.remove('hidden-search');
             homeSearchInput.focus();
-            // Hide the button
             homeSearchBtn.style.display = 'none';
         };
     }
 
-    // Trigger render/search on input change for the Home search box
     if (homeSearchInput) {
         homeSearchInput.addEventListener('input', () => this.render());
     }
@@ -868,7 +934,26 @@ class BookmarkApp {
     document.addEventListener('click',e=>{if(!bb.contains(e.target))m.style.display='none';});
 
     const fi=document.getElementById('file');
-    document.querySelectorAll('#Backup button').forEach(b=>{b.onclick=()=>{const a=b.dataset.a;if(a.startsWith('i')){fi.click();fi.dataset.a=a;}else if(a==='ej'){const blob=new Blob([JSON.stringify(this.links,null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const l=document.createElement('a');l.href=u;l.download='links.json';l.click();}else if(a==='ex'){const wb=XLSX.utils.book_new();Object.entries(this.links).forEach(([n,l])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(l),n.slice(0,31)));XLSX.writeFile(wb,'links.xlsx');}}});
+    document.querySelectorAll('#Backup button').forEach(b=>{b.onclick=()=>{
+        const a=b.dataset.a;
+        if(a.startsWith('i')){
+            // Import actions (ih, ij, ix)
+            fi.click();
+            fi.dataset.a=a;
+        }else if(a==='ej'){
+            // Export JSON
+            const blob=new Blob([JSON.stringify(this.links,null,2)],{type:'application/json'});
+            const u=URL.createObjectURL(blob);const l=document.createElement('a');l.href=u;l.download='links.json';l.click();
+        }else if(a==='ex'){
+            // Export Excel
+            const wb=XLSX.utils.book_new();
+            Object.entries(this.links).forEach(([n,l])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(l),n.slice(0,31)));
+            XLSX.writeFile(wb,'links.xlsx');
+        }else if(a==='eh'){
+            // Export HTML (New)
+            this.exportHtml();
+        }
+    };});
 
     // File import handler
     fi.onchange=e=>{
@@ -876,20 +961,37 @@ class BookmarkApp {
       const r=new FileReader();
       r.onload=ev=>{
         try{
-          let imp={};
-          if(f.name.endsWith('.json')||fi.dataset.a==='ij'){imp=JSON.parse(ev.target.result);}else{
-            const wb=XLSX.read(ev.target.result,{type:'binary'});
-            wb.SheetNames.forEach(s=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[s]);imp[s]=rows.map(r=>({name:r.Name||r.name||'',url:r.Url||r.url||'',hidden:!!r.Hidden||!!r.hidden})).filter(x=>x.name&&x.url);});
+          if(f.name.endsWith('.html')||fi.dataset.a==='ih'){
+            // Import HTML (New)
+            this.importHtml(ev.target.result);
+          }else{
+             // Import JSON or Excel
+            let imp={};
+            if(f.name.endsWith('.json')||fi.dataset.a==='ij'){
+                imp=JSON.parse(ev.target.result);
+            }else{
+                const wb=XLSX.read(ev.target.result,{type:'binary'});
+                wb.SheetNames.forEach(s=>{
+                    const rows=XLSX.utils.sheet_to_json(wb.Sheets[s]);
+                    imp[s]=rows.map(r=>({name:r.Name||r.name||'',url:r.Url||r.url||'',hidden:!!r.Hidden||!!r.hidden})).filter(x=>x.name&&x.url);
+                });
+            }
+
+            this.pushUndo();
+            Object.entries(imp).forEach(([s,l])=>{if(!this.links[s])this.links[s]=[];l.forEach(ln=>{if(!this.links[s].some(x=>x.url===ln.url))this.links[s].push(ln);});});
+            this.save();this.render();alert('Imported!');
           }
-          this.pushUndo();
-          Object.entries(imp).forEach(([s,l])=>{if(!this.links[s])this.links[s]=[];l.forEach(ln=>{if(!this.links[s].some(x=>x.url===ln.url))this.links[s].push(ln);});});
-          this.save();this.render();alert('Imported!');
         }catch(error){
             console.error("Import error:", error);
             alert('Import failed. Check console for details.');
         }
       };
-      f.name.endsWith('.json')||fi.dataset.a==='ij'?r.readAsText(f):r.readAsBinaryString(f);
+      // Determine read method based on file type
+      if (f.name.endsWith('.html') || f.name.endsWith('.json') || fi.dataset.a==='ij' || fi.dataset.a==='ih') {
+        r.readAsText(f);
+      } else {
+        r.readAsBinaryString(f);
+      }
     };
 
     // Search input handler for Settings tab
