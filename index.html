@@ -51,10 +51,10 @@
             background-color: var(--primary-color);
             color: white;
         }
-        .menu-container {
+        .Backup-container {
             position: relative;
         }
-        .menu-btn {
+        .Backup-btn {
             background-color: var(--primary-color);
             color: white;
             padding: 8px 15px;
@@ -63,7 +63,7 @@
             cursor: pointer;
             font-weight: bold;
         }
-        #menu {
+        #Backup {
             position: absolute;
             right: 0;
             top: 40px;
@@ -75,7 +75,7 @@
             z-index: 20;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        #menu button {
+        #Backup button {
             padding: 10px 20px;
             background: none;
             border: none;
@@ -83,10 +83,10 @@
             cursor: pointer;
             border-bottom: 1px solid var(--border-color);
         }
-        #menu button:last-child {
+        #Backup button:last-child {
             border-bottom: none;
         }
-        #menu button:hover {
+        #Backup button:hover {
             background-color: var(--secondary-color);
         }
         .content {
@@ -299,9 +299,9 @@
         <div class="tab active" data-t="home">Home</div>
         <div class="tab" data-t="set">Settings</div>
     </div>
-    <div class="menu-container">
-        <button id="backup" class="menu-btn">Menu 🔽</button>
-        <div id="menu">
+    <div class="Backup-container">
+        <button id="backup" class="Backup-btn">Backup 🔽</button>
+        <div id="Backup">
             <button data-a="ij">Import JSON</button>
             <button data-a="ix">Import Excel</button>
             <button data-a="ej">Export JSON</button>
@@ -369,6 +369,12 @@
         <input type="password" id="pinIn" placeholder="••••">
         <button id="unlock" class="btn-s">Unlock</button>
     </div>
+</div>
+
+<div>
+  <footer>
+    @copy 2025 Santosh Phuyal. All rights reserved.
+  </footer>
 </div>
 
 <script>
@@ -855,14 +861,14 @@ class BookmarkApp {
     document.getElementById('setP').onclick=async()=>{const p=document.getElementById('newP').value;if(!/^\d{4}$/.test(p))return alert('PIN must be 4 digits');storage.set(this.links,this.bin,await this.hashPin(p));alert('PIN set');document.getElementById('newP').value = ''; location.reload();};
     document.getElementById('remP').onclick=()=>{if(confirm('Remove PIN?')){storage.set(this.links,this.bin,'');alert('Removed');location.reload();}};
 
-    // Menu handlers
+    // Backup handlers
     const bb=document.getElementById('backup');
-    const m=document.getElementById('menu');
+    const m=document.getElementById('Backup');
     bb.onclick=e=>{e.stopPropagation();m.style.display=m.style.display==='flex'?'none':'flex';};
     document.addEventListener('click',e=>{if(!bb.contains(e.target))m.style.display='none';});
 
     const fi=document.getElementById('file');
-    document.querySelectorAll('#menu button').forEach(b=>{b.onclick=()=>{const a=b.dataset.a;if(a.startsWith('i')){fi.click();fi.dataset.a=a;}else if(a==='ej'){const blob=new Blob([JSON.stringify(this.links,null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const l=document.createElement('a');l.href=u;l.download='links.json';l.click();}else if(a==='ex'){const wb=XLSX.utils.book_new();Object.entries(this.links).forEach(([n,l])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(l),n.slice(0,31)));XLSX.writeFile(wb,'links.xlsx');}}});
+    document.querySelectorAll('#Backup button').forEach(b=>{b.onclick=()=>{const a=b.dataset.a;if(a.startsWith('i')){fi.click();fi.dataset.a=a;}else if(a==='ej'){const blob=new Blob([JSON.stringify(this.links,null,2)],{type:'application/json'});const u=URL.createObjectURL(blob);const l=document.createElement('a');l.href=u;l.download='links.json';l.click();}else if(a==='ex'){const wb=XLSX.utils.book_new();Object.entries(this.links).forEach(([n,l])=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(l),n.slice(0,31)));XLSX.writeFile(wb,'links.xlsx');}}});
 
     // File import handler
     fi.onchange=e=>{
