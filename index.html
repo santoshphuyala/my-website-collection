@@ -51,10 +51,10 @@
             background-color: var(--primary-color);
             color: white;
         }
-        .Backup-container {
+        .backup-container {
             position: relative;
         }
-        .Backup-btn {
+        .backup-btn {
             background-color: var(--primary-color);
             color: white;
             padding: 8px 15px;
@@ -63,7 +63,8 @@
             cursor: pointer;
             font-weight: bold;
         }
-        #Backup {
+        /* Old: #backup { ... } */
+        #backup-functionality { /* FIX: Target the dropdown by its new ID */
             position: absolute;
             right: 0;
             top: 40px;
@@ -75,7 +76,8 @@
             z-index: 20;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        #Backup button {
+        /* Old: #backup button { ... } */
+        #backup-functionality button {
             padding: 10px 20px;
             background: none;
             border: none;
@@ -83,10 +85,10 @@
             cursor: pointer;
             border-bottom: 1px solid var(--border-color);
         }
-        #Backup button:last-child {
+        #backup-functionality button:last-child {
             border-bottom: none;
         }
-        #Backup button:hover {
+        #backup-functionality button:hover {
             background-color: var(--secondary-color);
         }
         .content {
@@ -299,17 +301,19 @@
         <div class="tab active" data-t="home">Home</div>
         <div class="tab" data-t="set">Settings</div>
     </div>
-    <div class="Backup-container">
-        <button id="backup" class="Backup-btn">Backup 🔽</button>
-        <div id="Backup">
-            <button data-a="ih">Import HTML</button>
-            <button data-a="ij">Import JSON</button>
-            <button data-a="ix">Import Excel</button>
-            <hr style="margin: 0; border: none; border-top: 1px solid var(--border-color);">
-            <button data-a="eh">Export HTML</button>
-            <button data-a="ej">Export JSON</button>
-            <button data-a="ex">Export Excel</button>
-        </div>
+    <div class="menu-container">
+    <button id="backup" class="menu-btn">Backup & Export 🔽</button>
+    <div id="backup-functionality"> 
+        <button data-a="ih">Import HTML</button>
+        <button data-a="ij">Import JSON</button>
+        <button data-a="ix">Import Excel</button>
+        <hr style="margin: 0; border: none; border-top: 1px solid var(--border-color);">
+        <button data-a="eh">Export HTML</button>
+        <button data-a="ej">Export JSON</button>
+        <button data-a="ex">Export Excel</button>
+    </div>
+    <input type="file" id="file" style="display: none;">
+</div>
         <input type="file" id="file" style="display: none;">
     </div>
 </header>
@@ -927,14 +931,15 @@ class BookmarkApp {
     document.getElementById('setP').onclick=async()=>{const p=document.getElementById('newP').value;if(!/^\d{4}$/.test(p))return alert('PIN must be 4 digits');storage.set(this.links,this.bin,await this.hashPin(p));alert('PIN set');document.getElementById('newP').value = ''; location.reload();};
     document.getElementById('remP').onclick=()=>{if(confirm('Remove PIN?')){storage.set(this.links,this.bin,'');alert('Removed');location.reload();}};
 
-    // Backup handlers
-    const bb=document.getElementById('backup');
-    const m=document.getElementById('Backup');
+   // backup handlers (Menu toggle and export triggers)
+    const bb=document.getElementById('backup'); // The button ID remains 'backup'
+    const m=document.getElementById('backup-functionality'); // FIX: Target the new dropdown ID
     bb.onclick=e=>{e.stopPropagation();m.style.display=m.style.display==='flex'?'none':'flex';};
     document.addEventListener('click',e=>{if(!bb.contains(e.target))m.style.display='none';});
 
     const fi=document.getElementById('file');
-    document.querySelectorAll('#Backup button').forEach(b=>{b.onclick=()=>{
+    // FIX: Update selector to target buttons inside the new dropdown ID
+    document.querySelectorAll('#backup-functionality button').forEach(b=>{b.onclick=()=>{
         const a=b.dataset.a;
         if(a.startsWith('i')){
             // Import actions (ih, ij, ix)
@@ -955,42 +960,69 @@ class BookmarkApp {
         }
     };});
 
-    // File import handler
+  // File import handler (FIXED to ensure correct read method is called)
     fi.onchange=e=>{
-      const f=e.target.files[0];if(!f)return;
+      const f=e.target.files[0];
+      if(!f)return;
+      const action = fi.dataset.a;
+      
+      console.log(`[IMPORT] Starting import for action: ${action}, file: ${f.name}`);
+      
       const r=new FileReader();
+      
       r.onload=ev=>{
         try{
-          if(f.name.endsWith('.html')||fi.dataset.a==='ih'){
-            // Import HTML (New)
-            this.importHtml(ev.target.result);
-          }else{
-             // Import JSON or Excel
-            let imp={};
-            if(f.name.endsWith('.json')||fi.dataset.a==='ij'){
-                imp=JSON.parse(ev.target.result);
-            }else{
-                const wb=XLSX.read(ev.target.result,{type:'binary'});
-                wb.SheetNames.forEach(s=>{
-                    const rows=XLSX.utils.sheet_to_json(wb.Sheets[s]);
-                    imp[s]=rows.map(r=>({name:r.Name||r.name||'',url:r.Url||r.url||'',hidden:!!r.Hidden||!!r.hidden})).filter(x=>x.name&&x.url);
-                });
-            }
+          let imp={}; // Container for JSON/Excel links
 
-            this.pushUndo();
-            Object.entries(imp).forEach(([s,l])=>{if(!this.links[s])this.links[s]=[];l.forEach(ln=>{if(!this.links[s].some(x=>x.url===ln.url))this.links[s].push(ln);});});
-            this.save();this.render();alert('Imported!');
+          if(action === 'ih'){
+            console.log("[IMPORT] Processing as HTML.");
+            this.importHtml(ev.target.result);
+            alert('HTML bookmarks imported successfully!');
+            return; 
+            
+          } else if(action === 'ij'){
+            console.log("[IMPORT] Processing as JSON.");
+            imp=JSON.parse(ev.target.result);
+            
+          } else if(action === 'ix'){
+            console.log("[IMPORT] Processing as Excel (Binary Read).");
+            const wb=XLSX.read(ev.target.result,{type:'binary'});
+            wb.SheetNames.forEach(s=>{
+                const rows=XLSX.utils.sheet_to_json(wb.Sheets[s]);
+                imp[s]=rows.map(r=>({name:r.Name||r.name||'',url:r.Url||r.url||'',hidden:!!r.Hidden||!!r.hidden})).filter(x=>x.name&&x.url);
+            });
           }
+
+          // --- MERGE LOGIC (Applies only to JSON/Excel imports) ---
+          console.log("[IMPORT] Merging data into links object. Imported sections:", Object.keys(imp));
+          this.pushUndo();
+          Object.entries(imp).forEach(([s,l])=>{
+              if(!this.links[s]) this.links[s]=[];
+              l.forEach(ln=>{
+                  if(!this.links[s].some(x=>x.url===ln.url)) {
+                      this.links[s].push(ln);
+                  }
+              });
+          });
+          this.save();
+          this.render();
+          alert('Imported!');
+          
         }catch(error){
             console.error("Import error:", error);
-            alert('Import failed. Check console for details.');
+            alert('Import failed. Check console for details. (JSON/Excel structure issue)');
+        } finally {
+            e.target.value = ''; // Clear file input
         }
       };
-      // Determine read method based on file type
-      if (f.name.endsWith('.html') || f.name.endsWith('.json') || fi.dataset.a==='ij' || fi.dataset.a==='ih') {
-        r.readAsText(f);
+      
+      // CRITICAL FIX: Determine read method *before* calling the read function
+      if (action === 'ix') {
+        r.readAsBinaryString(f); // For Excel files
+        console.log("[IMPORT] Using r.readAsBinaryString().");
       } else {
-        r.readAsBinaryString(f);
+        r.readAsText(f); // For HTML and JSON files
+        console.log("[IMPORT] Using r.readAsText().");
       }
     };
 
